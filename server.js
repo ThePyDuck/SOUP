@@ -291,6 +291,11 @@ app.get("/files", authMiddleware, (req, res) => {
 // =====================
 app.get("/health", (req, res) => res.json({ ok: true }));
 
+// =====================
+// Serve frontend
+// =====================
+app.get("/", (req, res) => res.sendFile(path.join(__dirname, "index.html")));
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
