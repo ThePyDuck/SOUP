@@ -10,6 +10,17 @@ const FormData = require("form-data");
 const app = express();
 const upload = multer({ storage: multer.diskStorage({ destination: "uploads/" }) });
 
+// =====================
+// CORS
+// =====================
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "x-api-key, Content-Type");
+  if (req.method === "OPTIONS") return res.sendStatus(204);
+  next();
+});
+
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const CHANNEL_ID = process.env.CHANNEL_ID;
 const API_KEY = process.env.API_KEY; // optional auth
