@@ -8,7 +8,7 @@ const path = require("path");
 const FormData = require("form-data");
 
 const app = express();
-const upload = multer({ storage: multer.diskStorage({ destination: "uploads/" }) });
+const upload = multer({ storage: multer.memoryStorage() });
 
 // =====================
 // CORS
@@ -127,48 +127,35 @@ async function getFreshChunkUrl(messageId) {
 // Upload route
 // =====================
 app.post("/upload", authMiddleware, upload.single("file"), async (req, res) => {
-  const tempPath = req.file?.path;
   try {
     if (!req.file) return res.status(400).json({ error: "No file provided" });
 
-    // Stream read in chunks to avoid loading whole file into RAM
-    const fileSize = req.file.size;
+    const fileBuffer = req.file.buffer; // memoryStorage gives us buffer directly
+    const fileSize = fileBuffer.length;
     const fileId = generateId();
     const totalChunks = Math.ceil(fileSize / CHUNK_SIZE);
     const chunks = [];
+    const fileHash = crypto.createHash("sha256").update(fileBuffer).digest("hex");
 
-    const fileHash = crypto.createHash("sha256");
-    const fileHandle = await fs.open(tempPath, "r");
+    for (let i = 0; i < totalChunks; i++) {
+      const start = i * CHUNK_SIZE;
+      const chunk = fileBuffer.slice(start, start + CHUNK_SIZE);
 
-    try {
-      for (let i = 0; i < totalChunks; i++) {
-        const start = i * CHUNK_SIZE;
-        const chunkSize = Math.min(CHUNK_SIZE, fileSize - start);
-        const buffer = Buffer.alloc(chunkSize);
-        await fileHandle.read(buffer, 0, chunkSize, start);
-        fileHash.update(buffer);
+      const index = i + 1;
+      const name = `${fileId}_part_${String(index).padStart(3, "0")}`;
+      const chunkMeta = await uploadChunk(chunk, name);
 
-        const index = i + 1;
-        const name = `${fileId}_part_${String(index).padStart(3, "0")}`;
-        const chunkMeta = await uploadChunk(buffer, name);
+      chunks.push({ index, ...chunkMeta });
+      console.log(`Uploaded chunk ${index}/${totalChunks}`);
 
-        chunks.push({ index, ...chunkMeta });
-        console.log(`Uploaded chunk ${index}/${totalChunks}`);
-
-        // Small delay between chunks to be nice to Discord rate limits
-        if (i < totalChunks - 1) await sleep(300);
-      }
-    } finally {
-      await fileHandle.close();
+      if (i < totalChunks - 1) await sleep(300);
     }
-
-    const checksum = fileHash.digest("hex");
 
     db[fileId] = {
       name: req.file.originalname,
       size: fileSize,
       totalChunks,
-      checksum,
+      checksum: fileHash,
       chunks,
       uploadedAt: new Date().toISOString(),
     };
@@ -178,8 +165,6 @@ app.post("/upload", authMiddleware, upload.single("file"), async (req, res) => {
   } catch (e) {
     console.error("Upload error:", e.message);
     res.status(500).json({ error: "Upload failed", detail: e.message });
-  } finally {
-    if (tempPath) await fs.remove(tempPath).catch(() => {});
   }
 });
 
