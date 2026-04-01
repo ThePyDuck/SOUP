@@ -8,7 +8,7 @@ const path = require("path");
 const FormData = require("form-data");
 
 const app = express();
-const upload = multer({ dest: "uploads/" });
+const upload = multer({ storage: multer.diskStorage({ destination: "uploads/" }) });
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const CHANNEL_ID = process.env.CHANNEL_ID;
