@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DISKVAULT</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet"/>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111;
+    --border: #222;
+    --accent: #5865F2;
+    --accent2: #EB459E;
+    --text: #f0f0f0;
+    --muted: #555;
+    --success: #57F287;
+    --error: #ED4245;
+    --mono: 'Space Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* noise overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.4;
+  }
+
+  header {
+    padding: 2rem 2.5rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    z-index: 1;
+  }
+
+  .logo {
+    font-size: 1.4rem;
+    font-weight: 800;
+    letter-spacing: 0.15em;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .logo-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 12px var(--accent);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  .config-row {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+  }
+
+  input[type="text"], input[type="password"] {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    outline: none;
+    transition: border-color 0.2s;
+    width: 220px;
+  }
+
+  input:focus { border-color: var(--accent); }
+  input::placeholder { color: var(--muted); }
+
+  .main {
+    flex: 1;
+    padding: 2.5rem;
+    max-width: 900px;
+    width: 100%;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Drop zone */
+  .dropzone {
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 3.5rem 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 2.5rem;
+  }
+
+  .dropzone:hover, .dropzone.dragover {
+    border-color: var(--accent);
+    background: rgba(88, 101, 242, 0.05);
+  }
+
+  .dropzone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  .drop-icon {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    display: block;
+    filter: grayscale(1);
+    transition: filter 0.2s;
+  }
+
+  .dropzone:hover .drop-icon { filter: none; }
+
+  .drop-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 0.4rem;
+    letter-spacing: 0.05em;
+  }
+
+  .drop-sub {
+    font-size: 0.8rem;
+    color: var(--muted);
+    font-family: var(--mono);
+  }
+
+  /* Progress */
+  .progress-wrap {
+    display: none;
+    margin-bottom: 2.5rem;
+  }
+
+  .progress-wrap.active { display: block; }
+
+  .progress-label {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .progress-bar-bg {
+    height: 4px;
+    background: var(--border);
+    border-radius: 99px;
+    overflow: hidden;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 99px;
+    width: 0%;
+    transition: width 0.3s ease;
+  }
+
+  .status-msg {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    margin-top: 0.5rem;
+    min-height: 1rem;
+  }
+
+  .status-msg.ok { color: var(--success); }
+  .status-msg.err { color: var(--error); }
+  .status-msg.info { color: var(--accent); }
+
+  /* File list */
+  .section-title {
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .file-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .file-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.9rem 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transition: border-color 0.15s;
+    animation: fadeUp 0.3s ease both;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .file-item:hover { border-color: #333; }
+
+  .file-icon {
+    font-size: 1.4rem;
+    flex-shrink: 0;
+  }
+
+  .file-info { flex: 1; min-width: 0; }
+
+  .file-name {
+    font-weight: 700;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 0.2rem;
+  }
+
+  .file-meta {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--muted);
+  }
+
+  .file-id {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    color: var(--muted);
+    background: #1a1a1a;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    flex-shrink: 0;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .btn {
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+    flex-shrink: 0;
+  }
+
+  .btn:active { transform: scale(0.97); }
+  .btn:hover { opacity: 0.85; }
+
+  .btn-dl {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .btn-del {
+    background: transparent;
+    color: var(--error);
+    border: 1px solid var(--error);
+    opacity: 0.6;
+  }
+
+  .btn-del:hover { opacity: 1; }
+
+  .empty {
+    text-align: center;
+    padding: 3rem;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 0.8rem;
+  }
+
+  .refresh-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+
+  .refresh-btn:hover { color: var(--text); border-color: #444; }
+
+  .toast {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--success);
+    padding: 0.75rem 1.2rem;
+    border-radius: 8px;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    z-index: 100;
+    transform: translateY(20px);
+    opacity: 0;
+    transition: all 0.3s ease;
+    pointer-events: none;
+  }
+
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.err { border-left-color: var(--error); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <span class="logo-dot"></span>
+    DISKVAULT
+  </div>
+  <div class="config-row">
+    <input type="text" id="serverUrl" placeholder="https://your-railway-url.com" />
+    <input type="password" id="apiKey" placeholder="x-api-key (optional)" />
+    <button class="refresh-btn" onclick="loadFiles()">↻ refresh</button>
+  </div>
+</header>
+
+<div class="main">
+
+  <!-- Drop zone -->
+  <div class="dropzone" id="dropzone">
+    <input type="file" id="fileInput" multiple />
+    <span class="drop-icon">📦</span>
+    <div class="drop-title">Drop files here or click to browse</div>
+    <div class="drop-sub">Any file type · Chunked upload · SHA-256 verified</div>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-label">
+      <span id="progressFilename">Uploading...</span>
+      <span id="progressPct">0%</span>
+    </div>
+    <div class="progress-bar-bg">
+      <div class="progress-bar-fill" id="progressFill"></div>
+    </div>
+    <div class="status-msg info" id="statusMsg"></div>
+  </div>
+
+  <!-- File list -->
+  <div class="section-title">Files</div>
+  <div class="file-list" id="fileList">
+    <div class="empty">Enter your server URL above and hit refresh.</div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ── Config ──────────────────────────────────────────────
+  function getUrl() { return (document.getElementById('serverUrl').value || '').replace(/\/$/, ''); }
+  function getKey() { return document.getElementById('apiKey').value; }
+  function headers(extra = {}) {
+    const h = { ...extra };
+    const k = getKey();
+    if (k) h['x-api-key'] = k;
+    return h;
+  }
+
+  // Persist config
+  window.addEventListener('load', () => {
+    document.getElementById('serverUrl').value = localStorage.getItem('dv_url') || window.location.origin;
+    document.getElementById('apiKey').value = localStorage.getItem('dv_key') || '';
+    if (getUrl()) loadFiles();
+  });
+  document.getElementById('serverUrl').addEventListener('change', () => {
+    localStorage.setItem('dv_url', getUrl());
+    loadFiles();
+  });
+  document.getElementById('apiKey').addEventListener('change', () => {
+    localStorage.setItem('dv_key', getKey());
+  });
+
+  // ── Toast ────────────────────────────────────────────────
+  function toast(msg, isErr = false) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (isErr ? ' err' : '');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => { t.className = 'toast'; }, 3000);
+  }
+
+  // ── File icon by extension ────────────────────────────────
+  function fileIcon(name) {
+    const ext = name.split('.').pop().toLowerCase();
+    const map = {
+      pdf: '📄', zip: '🗜️', rar: '🗜️', '7z': '🗜️', tar: '🗜️', gz: '🗜️',
+      mp4: '🎬', mkv: '🎬', avi: '🎬', mov: '🎬', webm: '🎬',
+      mp3: '🎵', flac: '🎵', wav: '🎵', ogg: '🎵',
+      jpg: '🖼️', jpeg: '🖼️', png: '🖼️', gif: '🖼️', webp: '🖼️', svg: '🖼️',
+      js: '📜', ts: '📜', py: '🐍', json: '📋', html: '🌐', css: '🎨',
+      exe: '⚙️', dmg: '⚙️', deb: '⚙️', apk: '📱',
+      doc: '📝', docx: '📝', xls: '📊', xlsx: '📊', ppt: '📊', pptx: '📊',
+    };
+    return map[ext] || '📁';
+  }
+
+  function fmtSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    if (bytes < 1024 * 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+    return (bytes / 1024 / 1024 / 1024).toFixed(2) + ' GB';
+  }
+
+  // ── Load files ───────────────────────────────────────────
+  async function loadFiles() {
+    const url = getUrl();
+    if (!url) return;
+    try {
+      const r = await fetch(`${url}/files`, { headers: headers() });
+      if (!r.ok) throw new Error(`${r.status}`);
+      const files = await r.json();
+      renderFiles(files);
+    } catch (e) {
+      document.getElementById('fileList').innerHTML = `<div class="empty err" style="color:var(--error)">Could not reach server: ${e.message}</div>`;
+    }
+  }
+
+  function renderFiles(files) {
+    const el = document.getElementById('fileList');
+    if (!files.length) {
+      el.innerHTML = '<div class="empty">No files yet. Upload something!</div>';
+      return;
+    }
+    el.innerHTML = '';
+    files.forEach((f, i) => {
+      const item = document.createElement('div');
+      item.className = 'file-item';
+      item.style.animationDelay = `${i * 40}ms`;
+      item.innerHTML = `
+        <span class="file-icon">${fileIcon(f.name)}</span>
+        <div class="file-info">
+          <div class="file-name">${escHtml(f.name)}</div>
+          <div class="file-meta">${f.size ? fmtSize(f.size) : ''} ${f.uploadedAt ? '· ' + new Date(f.uploadedAt).toLocaleString() : ''}</div>
+        </div>
+        <span class="file-id" title="${f.id}">${f.id}</span>
+        <button class="btn btn-dl" onclick="downloadFile('${f.id}','${escHtml(f.name)}')">⬇ Download</button>
+        <button class="btn btn-del" onclick="deleteFile('${f.id}', this)">✕</button>
+      `;
+      el.appendChild(item);
+    });
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── Download ─────────────────────────────────────────────
+  async function downloadFile(id, name) {
+    const url = getUrl();
+    if (!url) { toast('Set server URL first', true); return; }
+    toast(`Downloading ${name}…`);
+    try {
+      const r = await fetch(`${url}/download/${id}`, { headers: headers() });
+      if (!r.ok) throw new Error(`${r.status}`);
+      const blob = await r.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      toast(`Downloaded ${name}`);
+    } catch (e) {
+      toast(`Download failed: ${e.message}`, true);
+    }
+  }
+
+  // ── Delete ───────────────────────────────────────────────
+  async function deleteFile(id, btn) {
+    if (!confirm('Delete this file? This also removes it from Discord.')) return;
+    const url = getUrl();
+    try {
+      const r = await fetch(`${url}/files/${id}`, { method: 'DELETE', headers: headers() });
+      if (!r.ok) throw new Error(`${r.status}`);
+      btn.closest('.file-item').remove();
+      toast('File deleted');
+      // if list empty
+      if (!document.querySelector('.file-item')) {
+        document.getElementById('fileList').innerHTML = '<div class="empty">No files yet. Upload something!</div>';
+      }
+    } catch (e) {
+      toast(`Delete failed: ${e.message}`, true);
+    }
+  }
+
+  // ── Upload ───────────────────────────────────────────────
+  const dropzone = document.getElementById('dropzone');
+
+  dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('dragover'); });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+  dropzone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropzone.classList.remove('dragover');
+    handleFiles(e.dataTransfer.files);
+  });
+
+  document.getElementById('fileInput').addEventListener('change', e => {
+    handleFiles(e.target.files);
+    e.target.value = '';
+  });
+
+  async function handleFiles(files) {
+    const url = getUrl();
+    if (!url) { toast('Set server URL first', true); return; }
+
+    for (const file of files) {
+      await uploadFile(file, url);
+    }
+    await loadFiles();
+  }
+
+  async function uploadFile(file, url) {
+    const wrap = document.getElementById('progressWrap');
+    const fill = document.getElementById('progressFill');
+    const pct = document.getElementById('progressPct');
+    const fname = document.getElementById('progressFilename');
+    const msg = document.getElementById('statusMsg');
+
+    wrap.classList.add('active');
+    fname.textContent = file.name;
+    fill.style.width = '0%';
+    pct.textContent = '0%';
+    msg.textContent = 'Preparing...';
+    msg.className = 'status-msg info';
+
+    // Use XHR so we get real upload progress
+    return new Promise((resolve) => {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${url}/upload`);
+      const k = getKey();
+      if (k) xhr.setRequestHeader('x-api-key', k);
+
+      xhr.upload.addEventListener('progress', e => {
+        if (e.lengthComputable) {
+          const p = Math.round((e.loaded / e.total) * 100);
+          fill.style.width = p + '%';
+          pct.textContent = p + '%';
+          msg.textContent = p < 100 ? `Uploading... ${fmtSize(e.loaded)} / ${fmtSize(e.total)}` : 'Processing chunks on server...';
+        }
+      });
+
+      xhr.addEventListener('load', () => {
+        if (xhr.status === 200) {
+          fill.style.width = '100%';
+          pct.textContent = '100%';
+          msg.textContent = '✓ Upload complete!';
+          msg.className = 'status-msg ok';
+          toast(`Uploaded ${file.name}`);
+        } else {
+          msg.textContent = `✗ Upload failed (${xhr.status})`;
+          msg.className = 'status-msg err';
+          toast(`Upload failed: ${xhr.status}`, true);
+        }
+        setTimeout(() => wrap.classList.remove('active'), 2000);
+        resolve();
+      });
+
+      xhr.addEventListener('error', () => {
+        msg.textContent = '✗ Network error';
+        msg.className = 'status-msg err';
+        toast('Network error during upload', true);
+        setTimeout(() => wrap.classList.remove('active'), 2000);
+        resolve();
+      });
+
+      xhr.send(formData);
+    });
+  }
+</script>
+</body>
+</html>
